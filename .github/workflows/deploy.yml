@@ -107,6 +107,6 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # Restart backend
-            pkill -f "uvicorn" || true
-            nohup venv/bin/uvicorn app.api:app --host 0.0.0.0 --port 8000 &
+            # Restart backend via systemd
+            sudo systemctl daemon-reload
+            sudo systemctl restart fastapi
