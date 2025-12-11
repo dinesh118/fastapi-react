@@ -47,7 +47,7 @@ jobs:
         run: |
           cd frontend
           npm install
-          npm run build -- --noEmitOnError false
+          npm run build
 
       - name: Package frontend
         run: tar -czf frontend-dist.tar.gz frontend/dist
