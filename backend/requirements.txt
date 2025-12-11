@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic
+sqlalchemy        # if you use a database
+psycopg2-binary   # if PostgreSQL
+python-multipart  # if handling file uploads/forms
