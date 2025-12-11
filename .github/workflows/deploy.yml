@@ -1,0 +1,105 @@
+name: Build and Deploy FastAPI + React
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'   # use 3.10 (safe for Ubuntu VM)
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Package backend
+        run: tar -czf backend.tar.gz backend
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend
+          path: backend.tar.gz
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies and build
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Package frontend
+        run: tar -czf frontend-dist.tar.gz frontend/dist
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend
+          path: frontend-dist.tar.gz
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - name: Download backend artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: backend
+          path: .
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend
+          path: .
+
+      - name: Copy files to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          source: "backend.tar.gz,frontend-dist.tar.gz"
+          target: "/var/www"
+
+      - name: Run setup on VM
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            cd /var/www
+            tar -xzf backend.tar.gz -C /var/www/backend --strip-components=1
+            tar -xzf frontend-dist.tar.gz -C /var/www/frontend --strip-components=2
+
+            # Backend setup
+            cd /var/www/backend
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt
+
+            # Restart backend
+            pkill -f "uvicorn" || true
+            nohup venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 &
