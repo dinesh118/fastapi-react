@@ -1,5 +1,7 @@
-import uvicorn
+from fastapi import FastAPI
 
+app = FastAPI()
 
-if __name__ == "__main__":
-    uvicorn.run("app.api:app", host="0.0.0.0", port=8000, reload=True)
+@app.get("/todo")
+def get_todos():
+    return {"data": [{"id": "1", "item": "Sample todo"}]}
